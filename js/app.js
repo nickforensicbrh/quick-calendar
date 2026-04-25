@@ -185,6 +185,7 @@ function initNewForm() {
     reminderMin: null,
     colorId: null,
     photos: [],
+    attachments: [],
   };
   document.getElementById('fCalendar').disabled = false;
   renderForm(state);
@@ -221,6 +222,15 @@ function eventToFormData(event, calendarId) {
   let reminderMin = null;
   const override = event.reminders?.overrides?.find(o => o.method === 'popup');
   if (override) reminderMin = override.minutes;
+  // Read-only carry of native Calendar attachments[]. Never sent in the PATCH
+  // payload — supportsAttachments=true on PATCH tells Google to preserve them.
+  const attachments = (event.attachments || []).map(a => ({
+    fileId: a.fileId || null,
+    fileUrl: a.fileUrl || '',
+    title: a.title || 'attachment',
+    mimeType: a.mimeType || '',
+    iconLink: a.iconLink || '',
+  }));
   return {
     title: event.summary || '',
     calendarId,
@@ -230,6 +240,7 @@ function eventToFormData(event, calendarId) {
     reminderMin,
     colorId: event.colorId || null,
     photos,
+    attachments,
   };
 }
 
@@ -540,28 +551,32 @@ async function confirmDelete() {
   state.deletingEvent = null;
   if (!event) return;
 
+  // Delete the calendar event FIRST and only proceed once the server confirms.
+  // Drive cleanup of description-photos runs after, best-effort. attachments[]
+  // files are not touched — those aren't owned by the PWA.
+  try {
+    await withFreshToken(() => deleteEvent(state.accessToken, event.calendarId, event.id));
+  } catch (err) {
+    if (err.status === 404) {
+      // Already deleted elsewhere — treat as success.
+    } else {
+      // Surface the failure and keep the event visible — local state untouched.
+      showToast('ลบไม่สำเร็จ: ' + friendlyApiError(err));
+      return;
+    }
+  }
+
   const { links } = parsePhotoLinksFromDescription(event.description || '');
   const fileIds = links.map(extractDriveFileId).filter(Boolean);
-
-  try {
-    // Best-effort photo cleanup (continue on individual failure per SPEC §9.4)
-    for (const fileId of fileIds) {
-      try { await withFreshToken(() => deletePhoto(state.accessToken, fileId)); }
-      catch (_) { /* swallow */ }
-    }
-    try {
-      await withFreshToken(() => deleteEvent(state.accessToken, event.calendarId, event.id));
-    } catch (err) {
-      // 404 = already deleted elsewhere — treat as success and refresh
-      if (err.status !== 404) throw err;
-    }
-    showToast(`ลบ "${event.summary || '(ไม่มีชื่อ)'}" แล้ว`);
-    await loadMonthEvents();
-    showScreen('edit-date');
-    loadHomeData();
-  } catch (err) {
-    showToast('ลบไม่สำเร็จ: ' + friendlyApiError(err));
+  for (const fileId of fileIds) {
+    try { await withFreshToken(() => deletePhoto(state.accessToken, fileId)); }
+    catch (_) { /* SPEC §9.4: best-effort cleanup */ }
   }
+
+  showToast(`ลบ "${event.summary || '(ไม่มีชื่อ)'}" แล้ว`);
+  await loadMonthEvents();
+  showScreen('edit-date');
+  loadHomeData();
 }
 
 function showToast(msg) {
@@ -674,7 +689,7 @@ function handleAction(action, el) {
       // For existing Drive photos, queue for delete on save
       if (p && !p.file && p.driveFileId) state.photosToDelete.push(p.driveFileId);
       state.formData.photos.splice(idx, 1);
-      renderPhotos(state.formData.photos);
+      renderPhotos(state.formData.photos, state.formData.attachments);
       break;
     }
     case 'submit-event': submitEvent(); break;
@@ -745,7 +760,7 @@ function initPhotoInputs() {
         driveLink: null,
       });
     }
-    renderPhotos(state.formData.photos);
+    renderPhotos(state.formData.photos, state.formData.attachments);
     ev.target.value = '';
   };
   document.getElementById('fCam').addEventListener('change', onChange);

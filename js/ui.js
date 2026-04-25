@@ -80,7 +80,7 @@ export function renderForm(state) {
   document.getElementById('fTimeRow').style.display = f.allDay ? 'none' : '';
   renderCalendarSelect(state);
   updatePickerLabels(state);
-  renderPhotos(state.formData.photos || []);
+  renderPhotos(state.formData.photos || [], state.formData.attachments || []);
   renderColorPicker(state);
   document.getElementById('addTitle').textContent = state.formMode === 'edit' ? 'แก้ไข event' : 'เพิ่ม event';
   clearFormError();
@@ -140,7 +140,7 @@ export function updatePickerLabels(state) {
   document.getElementById('fEndTimeLbl').textContent = fmtHM(f.endTime);
 }
 
-export function renderPhotos(photos) {
+export function renderPhotos(photos, attachments = []) {
   const grid = document.getElementById('fPics');
   grid.replaceChildren();
   photos.forEach((p, idx) => {
@@ -160,6 +160,53 @@ export function renderPhotos(photos) {
     thumb.appendChild(btn);
     grid.appendChild(thumb);
   });
+
+  // Read-only attachments[] from the native Calendar app — distinct gold border
+  // + 🔒 badge to signal "managed elsewhere". Tapping opens the Drive viewer.
+  for (const a of attachments) {
+    const isImage = (a.mimeType || '').startsWith('image/');
+    if (isImage) {
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb locked';
+      thumb.title = a.title + ' — แก้ไขใน Google Calendar';
+      const img = document.createElement('img');
+      img.alt = a.title;
+      img.src = a.fileId
+        ? `https://drive.google.com/thumbnail?id=${a.fileId}&sz=w400`
+        : (a.iconLink || '');
+      thumb.appendChild(img);
+      const lock = document.createElement('div');
+      lock.className = 'thumb-lock';
+      lock.textContent = '🔒';
+      thumb.appendChild(lock);
+      if (a.fileUrl) {
+        thumb.style.cursor = 'pointer';
+        thumb.addEventListener('click', () => window.open(a.fileUrl, '_blank', 'noopener'));
+      }
+      grid.appendChild(thumb);
+    } else {
+      const chip = document.createElement('div');
+      chip.className = 'thumb attach-chip';
+      chip.title = a.title + ' — แก้ไขใน Google Calendar';
+      const lock = document.createElement('div');
+      lock.className = 'thumb-lock';
+      lock.textContent = '🔒';
+      chip.appendChild(lock);
+      const icon = document.createElement('div');
+      icon.className = 'attach-chip-icon';
+      icon.textContent = '📎';
+      chip.appendChild(icon);
+      const name = document.createElement('div');
+      name.className = 'attach-chip-name';
+      name.textContent = a.title;
+      chip.appendChild(name);
+      if (a.fileUrl) {
+        chip.style.cursor = 'pointer';
+        chip.addEventListener('click', () => window.open(a.fileUrl, '_blank', 'noopener'));
+      }
+      grid.appendChild(chip);
+    }
+  }
 }
 
 export function showFormError(msg) {

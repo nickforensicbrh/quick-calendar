@@ -31,8 +31,11 @@ async function apiGet(accessToken, path, params = {}) {
   return res.json();
 }
 
-async function apiJson(accessToken, method, path, body) {
-  const res = await fetch(`${BASE}${path}`, {
+async function apiJson(accessToken, method, path, body, params = {}) {
+  const cleaned = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null));
+  const qs = new URLSearchParams(cleaned).toString();
+  const url = `${BASE}${path}${qs ? '?' + qs : ''}`;
+  const res = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -49,15 +52,17 @@ async function apiJson(accessToken, method, path, body) {
 }
 
 export function createEvent(accessToken, calendarId, eventBody) {
-  return apiJson(accessToken, 'POST', `/calendars/${encodeURIComponent(calendarId)}/events`, eventBody);
+  return apiJson(accessToken, 'POST', `/calendars/${encodeURIComponent(calendarId)}/events`, eventBody, { supportsAttachments: 'true' });
 }
 
+// supportsAttachments=true: required by Google whenever an event has attachments[]
+// so the server preserves them across our PATCH (we never send the attachments field).
 export function updateEvent(accessToken, calendarId, eventId, eventBody) {
-  return apiJson(accessToken, 'PATCH', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, eventBody);
+  return apiJson(accessToken, 'PATCH', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, eventBody, { supportsAttachments: 'true' });
 }
 
 export function deleteEvent(accessToken, calendarId, eventId) {
-  return apiJson(accessToken, 'DELETE', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`);
+  return apiJson(accessToken, 'DELETE', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, undefined, { supportsAttachments: 'true' });
 }
 
 export async function listMonthEvents(accessToken, calendars, year, month0) {
