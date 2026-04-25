@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1A2744">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; connect-src 'self' https://*.googleapis.com https://accounts.google.com; img-src 'self' data: blob: https://*.google.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline'; manifest-src 'self'; worker-src 'self'; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self';">
+<title>Quick Calendar</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="phone" id="phone">
+
+  <!-- WELCOME / SIGN-IN -->
+  <section id="screen-welcome" class="screen active">
+    <div class="header">
+      <div class="header-spacer"></div>
+      <span class="header-title">Quick calendar</span>
+      <div class="header-spacer"></div>
+    </div>
+    <div class="welcome-body">
+      <div class="welcome-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <h2 class="welcome-title">Quick calendar</h2>
+      <p class="welcome-sub">บันทึก event พร้อมรูปภาพในขั้นตอนเดียว</p>
+      <div class="error-banner" id="welcomeError"></div>
+      <button class="btn" id="signInBtn" data-action="signin" disabled>กำลังโหลด...</button>
+      <div class="welcome-note">ต้องลงชื่อเข้าใช้ด้วยบัญชี Google ที่ได้รับอนุญาต</div>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen">
+    <div class="header">
+      <div class="header-spacer"></div>
+      <span class="header-title">Quick calendar</span>
+      <button class="icon-btn primary" aria-label="Sign out" data-action="open-signout">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="email-chip"><div class="email-dot"></div><span id="userEmail">you@gmail.com</span></div>
+      <div class="greeting">สวัสดีครับ พร้อมบันทึกกิจกรรมวันนี้</div>
+      <button class="btn" data-action="new-event">+ เพิ่ม</button>
+      <button class="btn" data-action="open-edit-date" style="margin-bottom: 20px;">แก้ไข / ลบ</button>
+      <div class="section-heading">Event เร็วๆ นี้</div>
+      <div id="upcomingEvents"></div>
+    </div>
+  </section>
+
+  <!-- ADD / EDIT EVENT FORM -->
+  <section id="screen-add" class="screen">
+    <div class="header">
+      <button class="icon-btn back" aria-label="Back" data-action="form-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="header-title" id="addTitle">เพิ่ม event</span>
+      <button class="icon-btn primary" aria-label="Home" data-action="go-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="field"><label class="label">ชื่อกิจกรรม *</label><input class="input" id="fTitle" placeholder="ชื่อกิจกรรม"/></div>
+      <div class="field"><label class="label">ปฏิทิน *</label>
+        <select class="input select" id="fCalendar"></select>
+      </div>
+      <div class="row">
+        <div class="field"><label class="label">วันที่เริ่ม</label>
+          <button type="button" class="picker-btn" data-action="open-date" data-target="start">
+            <span id="fStartDateLbl">—</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+        </div>
+        <div class="field"><label class="label">ถึงวันที่</label>
+          <button type="button" class="picker-btn" data-action="open-date" data-target="end">
+            <span id="fEndDateLbl">—</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="row allday-color-row">
+        <label class="checkbox-row" style="margin: 0;"><input type="checkbox" id="fAllDay" data-action="toggle-allday"/><span>ตลอดวัน</span></label>
+        <div class="color-picker">
+          <button type="button" class="color-trigger" id="colorTrigger" data-action="toggle-color-picker" aria-label="Select color"></button>
+          <div class="color-dropdown" id="colorDropdown"></div>
+        </div>
+      </div>
+      <div class="row" id="fTimeRow">
+        <div class="field"><label class="label">เวลาเริ่ม</label>
+          <button type="button" class="picker-btn" data-action="open-time" data-target="start">
+            <span id="fStartTimeLbl">10:00</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          </button>
+        </div>
+        <div class="field"><label class="label">สิ้นสุด</label>
+          <button type="button" class="picker-btn" data-action="open-time" data-target="end">
+            <span id="fEndTimeLbl">11:00</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field"><label class="label">สถานที่</label><input class="input" id="fLocation" placeholder="ระบุสถานที่ หรือ link ประชุม"/></div>
+      <div class="field"><label class="label">รายละเอียด</label><textarea class="input textarea" id="fDescription" placeholder="รายละเอียดเพิ่มเติม..."></textarea></div>
+      <div class="field">
+        <label class="label">แจ้งเตือน (ไม่บังคับ)</label>
+        <select class="input select" id="fReminder">
+          <option value="">ไม่แจ้งเตือน</option>
+          <option value="10">10 นาทีก่อน</option>
+          <option value="30">30 นาทีก่อน</option>
+          <option value="60">1 ชั่วโมงก่อน</option>
+          <option value="1440">1 วันก่อน</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">รูปภาพ (หลายรูปได้)</label>
+        <div class="photo-buttons">
+          <label class="photo-btn" for="fCam"><span class="photo-icon">📷</span>Camera</label>
+          <label class="photo-btn" for="fGal"><span class="photo-icon">🖼️</span>Photos</label>
+        </div>
+        <input id="fCam" type="file" accept="image/*" capture="environment" multiple style="display:none"/>
+        <input id="fGal" type="file" accept="image/*" multiple style="display:none"/>
+        <div class="photo-grid" id="fPics"></div>
+      </div>
+      <div class="error-banner" id="formError"></div>
+      <button class="btn" data-action="submit-event" style="margin-top: 20px; font-size: 16px; padding: 16px;">บันทึก event</button>
+    </div>
+  </section>
+
+  <!-- DATE PICKER -->
+  <section id="screen-pick-date" class="screen">
+    <div class="header">
+      <button class="icon-btn back" aria-label="Back" data-action="cancel-picker">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="header-title" id="dateTitle">เลือกวันที่</span>
+      <button class="icon-btn primary" aria-label="Home" data-action="go-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="cal-wrap">
+        <div class="cal-head">
+          <button class="cal-nav" data-action="prev-month" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div class="cal-month-wrap">
+            <div class="cal-month" id="datePickerMonth">—</div>
+            <button class="today-btn" data-action="jump-today-picker">วันนี้</button>
+          </div>
+          <button class="cal-nav" data-action="next-month" aria-label="Next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+        <div class="cal-grid" id="datePickerGrid"></div>
+      </div>
+      <div class="action-row" style="margin-top: 20px;">
+        <button class="btn btn-sm btn-danger" data-action="cancel-picker" style="margin: 0;">ยกเลิก</button>
+        <button class="btn btn-sm" data-action="save-date" style="margin: 0;">ตกลง</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIME PICKER -->
+  <section id="screen-pick-time" class="screen">
+    <div class="header">
+      <button class="icon-btn back" aria-label="Back" data-action="cancel-picker">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="header-title" id="timeTitle">เวลาเริ่ม</span>
+      <button class="icon-btn primary" aria-label="Home" data-action="go-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      </button>
+    </div>
+    <div class="clock-wrap">
+      <div class="time-display">
+        <div class="time-num active" id="timeHour" data-action="time-mode-hour">10</div>
+        <div class="time-sep">:</div>
+        <div class="time-num" id="timeMinute" data-action="time-mode-minute">00</div>
+      </div>
+      <div class="face" id="clockFace"></div>
+      <div class="action-row">
+        <button class="btn btn-sm btn-danger" data-action="cancel-picker" style="margin: 0;">ยกเลิก</button>
+        <button class="btn btn-sm" data-action="save-time" style="margin: 0;">ตกลง</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDIT DATE SELECTOR -->
+  <section id="screen-edit-date" class="screen">
+    <div class="header">
+      <button class="icon-btn back" aria-label="Back" data-nav="home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="header-title">แก้ไข / ลบ</span>
+      <button class="icon-btn primary" aria-label="Home" data-action="go-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div style="font-size: 13px; color: var(--navy); margin-bottom: 12px;">เลือกวันที่มี event เพื่อดูรายการ</div>
+      <div class="cal-wrap">
+        <div class="cal-head">
+          <button class="cal-nav" data-action="prev-month-edit" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div class="cal-month-wrap">
+            <div class="cal-month" id="editDateMonth">—</div>
+            <button class="today-btn" data-action="jump-today">วันนี้</button>
+          </div>
+          <button class="cal-nav" data-action="next-month-edit" aria-label="Next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+        <div class="cal-grid" id="editDateGrid"></div>
+      </div>
+      <div class="cal-loading" id="editDateLoading" style="display:none;">กำลังโหลด event...</div>
+      <div class="note">จุดสีทองใต้วันที่ = วันที่มี event</div>
+    </div>
+  </section>
+
+  <!-- EDIT LIST -->
+  <section id="screen-edit-list" class="screen">
+    <div class="header">
+      <button class="icon-btn back" aria-label="Back" data-action="back-to-edit-date">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="header-title" id="editListDate">รายการ event</span>
+      <button class="icon-btn primary" aria-label="Home" data-action="go-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      </button>
+    </div>
+    <div class="body">
+      <div class="section-heading" id="editListHeading">Events</div>
+      <div id="editListItems"></div>
+      <div class="note">ดูรายละเอียดเต็มได้ที่ Google Calendar</div>
+    </div>
+  </section>
+
+  <!-- LOADING (shell) -->
+  <section id="screen-loading" class="screen">
+    <div class="header">
+      <div class="header-spacer"></div>
+      <span class="header-title">กำลังบันทึก</span>
+      <div class="header-spacer"></div>
+    </div>
+    <div class="loading-body">
+      <div class="spinner"></div>
+      <div class="loading-title">กำลังบันทึก event...</div>
+      <div class="step done" id="step-upload"><span class="step-dot"></span><span>อัปโหลดรูปภาพ</span></div>
+      <div class="step active" id="step-create"><span class="step-dot"></span><span>กำลังสร้าง event</span></div>
+      <div class="step" id="step-done"><span class="step-dot"></span><span>เสร็จสิ้น</span></div>
+    </div>
+  </section>
+
+  <!-- SUCCESS -->
+  <section id="screen-success" class="screen">
+    <div class="success-body">
+      <div class="check-circle">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="success-title">เสร็จสิ้น</div>
+      <div class="success-card" id="successSummary">
+        <!-- Populated at save time in Step 4 -->
+      </div>
+      <button class="btn" data-action="new-event">+ เพิ่มอีก event</button>
+      <button class="btn" id="successBackToEditList" data-action="back-to-edit-flow" style="display:none;">กลับ แก้ไข / ลบ</button>
+      <button class="btn" data-nav="home">กลับหน้าแรก</button>
+    </div>
+  </section>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal" id="confirmDeleteModal">
+    <div class="modal-box">
+      <div class="modal-title">ยืนยันการลบ event</div>
+      <div class="modal-msg" id="confirmDeleteMsg">event นี้จะถูกลบถาวร</div>
+      <div class="modal-actions">
+        <button class="btn btn-sm" data-action="cancel-delete" style="margin: 0;">ยกเลิก</button>
+        <button class="btn btn-sm btn-danger" data-action="confirm-delete" style="margin: 0;">ลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIGN OUT MODAL -->
+  <div class="modal" id="signOutModal">
+    <div class="modal-box">
+      <div class="modal-title">ออกจากระบบ?</div>
+      <div class="modal-msg">คุณจะต้องลงชื่อเข้าใช้ใหม่เพื่อใช้งานอีกครั้ง</div>
+      <div class="modal-actions">
+        <button class="btn btn-sm" data-action="cancel-signout" style="margin: 0;">ยกเลิก</button>
+        <button class="btn btn-sm btn-danger" data-action="confirm-signout" style="margin: 0;">ออกจากระบบ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST MODAL -->
+  <div class="modal" id="toastModal">
+    <div class="modal-box" style="max-width: 240px;">
+      <div class="modal-title" id="toastMsg">สำเร็จ</div>
+      <button class="btn btn-sm" data-action="dismiss-toast" style="margin-top: 12px;">OK</button>
+    </div>
+  </div>
+
+  <!-- iOS INSTALL TUTORIAL -->
+  <div class="modal" id="iosInstallModal">
+    <div class="modal-box">
+      <div class="modal-title">ติดตั้งบน iPhone</div>
+      <div class="modal-msg">แตะปุ่ม <strong>Share</strong> ที่แถบล่าง<br>แล้วเลือก <strong>Add to Home Screen</strong></div>
+      <button class="btn btn-sm" data-action="dismiss-ios-install" style="margin: 0;">เข้าใจแล้ว</button>
+    </div>
+  </div>
+
+  <!-- INSTALL BANNER -->
+  <div class="install-banner" id="installBanner">
+    <span class="install-banner-msg">ติดตั้ง Quick Calendar เป็นแอป?</span>
+    <div class="install-banner-actions">
+      <button class="btn btn-sm btn-danger" data-action="dismiss-install" style="margin: 0; padding: 6px 10px; font-size: 12px;">ภายหลัง</button>
+      <button class="btn btn-sm" data-action="install-pwa" style="margin: 0; padding: 6px 12px; font-size: 12px;">ติดตั้ง</button>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

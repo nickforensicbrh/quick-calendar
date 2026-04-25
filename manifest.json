@@ -1,0 +1,20 @@
+{
+  "name": "Quick Calendar",
+  "short_name": "QuickCal",
+  "description": "Fast event creation with photo attachments for shared family calendars",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1A2744",
+  "background_color": "#F5F1E8",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

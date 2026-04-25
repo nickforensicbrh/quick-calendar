@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1A2744">
+<title>Quick Calendar — Prototype v3</title>
+
+<!--
+  ==========================================================================
+  Quick Calendar PWA — UI Prototype (v3, approved)
+
+  This is a UI-only prototype for Claude Code reference. It has no real
+  Google API integration; photo uploads stay in the browser, time/date
+  pickers only update local state, and deletes are simulated.
+
+  Use this file as the pixel-accurate reference for screens, layouts,
+  colors, typography, and interaction patterns. See SPEC.md for the
+  production implementation requirements.
+  ==========================================================================
+-->
+
+<style>
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Thai', sans-serif;
+  --color-text-secondary: #666;
+  --color-border-tertiary: rgba(0, 0, 0, 0.1);
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+
+  --navy: #1A2744;
+  --gold: #C9A961;
+  --gold-hover: #D4AF37;
+  --gold-border: #B08F4A;
+  --ivory: #F5F1E8;
+  --ivory-dark: #E8E2D4;
+  --success: #0F6E56;
+  --danger: #A32D2D;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #FAFAFA;
+  min-height: 100vh;
+  padding: 20px 16px 40px;
+  color-scheme: light;
+}
+
+.qc { max-width: 380px; margin: 0 auto; color-scheme: light; }
+.qc input, .qc select, .qc textarea { color-scheme: light; }
+.qc-hint { text-align: center; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 10px; }
+.qc-phone { background: var(--ivory); border-radius: var(--border-radius-lg); overflow: hidden; border: 0.5px solid var(--color-border-tertiary); min-height: 640px; position: relative; }
+.qc-hdr { background: var(--navy); padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; }
+.qc-title { font-size: 20px; font-weight: 500; color: var(--gold); letter-spacing: 0.2px; }
+.qc-ico { background: transparent; border: none; width: 32px; height: 32px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold); }
+.qc-ico:hover { background: rgba(201, 169, 97, 0.15); }
+.qc-back { color: var(--ivory); }
+.qc-ico-prim { background: var(--gold); color: var(--navy); border: 1px solid #E0C785; }
+.qc-ico-prim:hover { background: var(--gold-hover); }
+.qc-body { padding: 16px; }
+.qc-email { background: #FFFFFF; border: 1px solid var(--gold); border-radius: var(--border-radius-md); padding: 10px 12px; font-size: 13px; color: var(--navy); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(201, 169, 97, 0.15); }
+.qc-dot { width: 8px; height: 8px; background: var(--gold); border-radius: 50%; }
+.qc-hello { font-size: 14px; color: var(--navy); margin-bottom: 20px; }
+
+.qc-btn { background: var(--ivory); color: var(--navy); border: 1px solid var(--gold); border-radius: var(--border-radius-md); padding: 14px; font-size: 15px; font-weight: 500; cursor: pointer; width: 100%; font-family: var(--font-sans); box-shadow: 0 2px 4px rgba(201, 169, 97, 0.22); margin-bottom: 10px; }
+.qc-btn:hover { background: #FFFFFF; box-shadow: 0 3px 8px rgba(201, 169, 97, 0.35); }
+.qc-btn:active { transform: translateY(1px); }
+.qc-btn-sm { padding: 10px; font-size: 13px; margin-bottom: 0; }
+.qc-btn-danger { color: var(--danger); border-color: var(--danger); background: #FFFFFF; box-shadow: 0 2px 4px rgba(163, 45, 45, 0.15); }
+.qc-btn-danger:hover { background: #FCEBEB; }
+
+.qc-sec { font-size: 13px; font-weight: 500; color: var(--navy); margin: 16px 0 8px; }
+.qc-card { background: #FFFFFF; border: 0.5px solid rgba(26, 39, 68, 0.15); border-radius: var(--border-radius-md); padding: 12px; margin-bottom: 8px; }
+.qc-ev-title { font-size: 14px; font-weight: 500; color: var(--navy); margin-bottom: 4px; }
+.qc-ev-meta { font-size: 12px; color: rgba(26, 39, 68, 0.6); }
+
+.qc-chip { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 10px; margin-top: 6px; border: 1px solid; color: var(--navy); font-weight: 500; }
+.qc-chip-me { background: #E6F1FB; border-color: #185FA5; }
+.qc-chip-kid { background: #EAF3DE; border-color: #3B6D11; }
+.qc-chip-wife { background: #FBEAF0; border-color: #993556; }
+
+.qc-field { margin-bottom: 14px; }
+.qc-lbl { display: block; font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 6px; }
+.qc-in { width: 100%; padding: 10px 12px; background: #FFFFFF; color: var(--navy); border: 1px solid var(--gold); border-radius: var(--border-radius-md); font-size: 13px; font-family: var(--font-sans); box-shadow: 0 1px 2px rgba(201, 169, 97, 0.12); }
+.qc-in:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
+.qc-ta { min-height: 70px; resize: vertical; }
+.qc-sel { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231A2744' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+.qc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qc-chk { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--navy); }
+.qc-chk input { accent-color: var(--gold); }
+
+.qc-picker-btn { width: 100%; padding: 10px 12px; background: #FFFFFF; color: var(--navy); border: 1px solid var(--gold); border-radius: var(--border-radius-md); font-size: 13px; font-family: var(--font-sans); cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px rgba(201, 169, 97, 0.12); font-weight: 500; }
+.qc-picker-btn:hover { background: #FFFDF7; }
+
+.qc-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.qc-photo-btn { background: var(--ivory); color: var(--navy); border: 1px solid var(--gold); border-radius: var(--border-radius-md); padding: 14px 8px; font-size: 13px; cursor: pointer; text-align: center; font-family: var(--font-sans); font-weight: 500; box-shadow: 0 2px 4px rgba(201, 169, 97, 0.22); display: block; }
+.qc-photo-btn:hover { background: #FFFFFF; }
+.qc-photo-ico { font-size: 20px; display: block; margin-bottom: 4px; line-height: 1; }
+
+.qc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.qc-thumb { aspect-ratio: 1; background: var(--ivory-dark); border-radius: 6px; position: relative; overflow: hidden; border: 0.5px solid rgba(26, 39, 68, 0.15); }
+.qc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.qc-x { position: absolute; top: 2px; right: 2px; background: rgba(26, 39, 68, 0.85); color: var(--ivory); border: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; }
+
+.qc-calw { background: #FFFFFF; border: 1px solid var(--gold); border-radius: var(--border-radius-md); padding: 12px; box-shadow: 0 2px 4px rgba(201, 169, 97, 0.15); }
+.qc-ch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.qc-cm { font-size: 14px; font-weight: 500; color: var(--navy); }
+.qc-cn { background: var(--gold); border: 1px solid var(--gold-border); color: var(--navy); cursor: pointer; width: 32px; height: 32px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(201, 169, 97, 0.3); }
+.qc-cn:hover { background: var(--gold-hover); }
+.qc-cg { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.qc-dow { text-align: center; font-size: 11px; color: rgba(26,39,68,0.6); padding: 4px 0; }
+.qc-day { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--navy); cursor: pointer; border-radius: 6px; }
+.qc-day:hover { background: var(--ivory); }
+.qc-day.sel { background: var(--navy); color: var(--ivory); }
+.qc-day.ev::after { content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: var(--gold); border-radius: 50%; }
+.qc-day.sel.ev::after { background: var(--ivory); }
+.qc-day.disabled { color: rgba(26,39,68,0.2); cursor: not-allowed; text-decoration: line-through; }
+.qc-day.disabled:hover { background: transparent; }
+.qc-day.disabled.ev::after { background: rgba(201, 169, 97, 0.3); }
+
+.qc-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.qc-note { background: #FFFFFF; border: 1px solid var(--gold); border-left: 4px solid var(--gold); border-radius: var(--border-radius-md); padding: 10px 12px; font-size: 12px; color: var(--navy); margin-top: 16px; box-shadow: 0 1px 3px rgba(201, 169, 97, 0.15); }
+
+.qc-ld { padding: 40px 20px; text-align: center; }
+.qc-sp { width: 48px; height: 48px; border: 3px solid rgba(201, 169, 97, 0.2); border-top-color: var(--gold); border-radius: 50%; margin: 0 auto 20px; animation: qc-spin 1s linear infinite; }
+@keyframes qc-spin { to { transform: rotate(360deg); } }
+.qc-ld-t { font-size: 15px; color: var(--navy); margin-bottom: 16px; font-weight: 500; }
+.qc-step { font-size: 13px; color: rgba(26,39,68,0.55); margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.qc-sd { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(26,39,68,0.3); }
+.qc-step.done { color: var(--success); }
+.qc-step.done .qc-sd { background: var(--success); border-color: var(--success); }
+.qc-step.active { color: var(--gold); }
+.qc-step.active .qc-sd { background: var(--gold); border-color: var(--gold); }
+
+.qc-suc { padding: 40px 20px; text-align: center; }
+.qc-ck { width: 64px; height: 64px; border-radius: 50%; background: var(--navy); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 4px 12px rgba(26, 39, 68, 0.25); }
+.qc-suc-t { font-size: 18px; font-weight: 500; color: var(--navy); margin-bottom: 20px; }
+.qc-suc-c { background: #FFFFFF; border: 1px solid var(--gold); border-radius: var(--border-radius-md); padding: 14px; margin-bottom: 20px; text-align: left; box-shadow: 0 2px 6px rgba(201, 169, 97, 0.22); }
+.qc-suc-r { font-size: 13px; color: var(--navy); margin-bottom: 6px; display: flex; gap: 8px; }
+.qc-suc-r span:first-child { color: rgba(26,39,68,0.6); min-width: 70px; }
+
+.qc-clock-wrap { padding: 16px; }
+.qc-tbox { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 20px; }
+.qc-tnum { font-size: 44px; font-weight: 500; color: var(--navy); padding: 6px 14px; border-radius: 10px; cursor: pointer; min-width: 72px; text-align: center; background: #FFFFFF; border: 1px solid transparent; }
+.qc-tnum.on { background: var(--ivory); border-color: var(--gold); box-shadow: 0 2px 6px rgba(201, 169, 97, 0.3); }
+.qc-tsep { font-size: 40px; color: var(--navy); padding: 0 4px; }
+.qc-face { position: relative; width: 260px; height: 260px; margin: 0 auto 20px; background: #FFFFFF; border: 1px solid var(--gold); border-radius: 50%; box-shadow: 0 2px 10px rgba(201, 169, 97, 0.25); }
+.qc-cnum { position: absolute; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--navy); cursor: pointer; border-radius: 50%; transform: translate(-50%, -50%); z-index: 2; font-weight: 500; }
+.qc-cnum-inner { width: 30px; height: 30px; font-size: 12px; }
+.qc-cnum:hover { background: var(--ivory); }
+.qc-cnum.sel { background: var(--navy); color: var(--ivory); }
+.qc-cdot { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1; }
+.qc-cline { position: absolute; left: 50%; top: 50%; height: 2px; background: var(--gold); transform-origin: 0 50%; z-index: 0; transition: all 0.2s; }
+
+.qc-modal { position: absolute; inset: 0; background: rgba(26, 39, 68, 0.5); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.qc-modal.on { display: flex; }
+.qc-modal-box { background: #FFFFFF; border: 1px solid var(--gold); border-radius: var(--border-radius-lg); padding: 20px; max-width: 280px; width: 100%; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.qc-modal-title { font-size: 15px; font-weight: 500; color: var(--navy); margin-bottom: 8px; text-align: center; }
+.qc-modal-msg { font-size: 13px; color: rgba(26, 39, 68, 0.7); margin-bottom: 16px; text-align: center; }
+.qc-modal-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.qc-help { font-size: 12px; color: var(--color-text-secondary); text-align: center; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="qc">
+  <div class="qc-hint">Prototype v3 — UI reference only (no real API integration)</div>
+
+  <div class="qc-phone" id="qcPhone">
+
+    <!-- HOME SCREEN -->
+    <div id="sc-home" class="qc-sc">
+      <div class="qc-hdr">
+        <div style="width: 32px;"></div>
+        <span class="qc-title">Quick calendar</span>
+        <button class="qc-ico qc-ico-prim" aria-label="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+      <div class="qc-body">
+        <div class="qc-email"><div class="qc-dot"></div><span>you@gmail.com</span></div>
+        <div class="qc-hello">สวัสดีครับ พร้อมบันทึกกิจกรรมวันนี้</div>
+        <button class="qc-btn" onclick="qcGo('add')">+ เพิ่ม</button>
+        <button class="qc-btn" onclick="qcGo('editDate')" style="margin-bottom: 20px;">แก้ไข / ลบ</button>
+        <div class="qc-sec">Event เร็วๆ นี้</div>
+        <div class="qc-card">
+          <div class="qc-ev-title">นัดหมอฟัน</div>
+          <div class="qc-ev-meta">25 เม.ย. 2569 · 10:00 — 11:00</div>
+          <span class="qc-chip qc-chip-me">ปฏิทินของฉัน</span>
+        </div>
+        <div class="qc-card">
+          <div class="qc-ev-title">รับลูกจากโรงเรียน</div>
+          <div class="qc-ev-meta">24 เม.ย. 2569 · 16:30 — 17:00</div>
+          <span class="qc-chip qc-chip-kid">ปฏิทินลูก</span>
+        </div>
+        <div class="qc-card">
+          <div class="qc-ev-title">นัดเพื่อนภรรยา</div>
+          <div class="qc-ev-meta">30 เม.ย. 2569 · ทั้งวัน</div>
+          <span class="qc-chip qc-chip-wife">ปฏิทินภรรยา</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADD / EDIT EVENT FORM -->
+    <div id="sc-add" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <button class="qc-ico qc-back" onclick="qcGo('home')" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="qc-title" id="addTitle">เพิ่ม event</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-body">
+        <div class="qc-field"><label class="qc-lbl">ชื่อกิจกรรม *</label><input class="qc-in" placeholder="เช่น นัดหมอฟัน"/></div>
+        <div class="qc-field"><label class="qc-lbl">ปฏิทิน *</label>
+          <select class="qc-in qc-sel"><option>ปฏิทินของฉัน</option><option>ปฏิทินลูก</option><option>ปฏิทินภรรยา</option></select>
+        </div>
+        <div class="qc-row">
+          <div class="qc-field"><label class="qc-lbl">วันที่เริ่ม</label>
+            <button type="button" class="qc-picker-btn" onclick="qcOpenDate('start')">
+              <span id="qcDateStartLbl">25/04/2026</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </button>
+          </div>
+          <div class="qc-field"><label class="qc-lbl">ถึงวันที่</label>
+            <button type="button" class="qc-picker-btn" onclick="qcOpenDate('end')">
+              <span id="qcDateEndLbl">25/04/2026</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </button>
+          </div>
+        </div>
+        <label class="qc-chk"><input type="checkbox"/><span>ตลอดวัน</span></label>
+        <div class="qc-row">
+          <div class="qc-field"><label class="qc-lbl">เวลาเริ่ม</label>
+            <button type="button" class="qc-picker-btn" onclick="qcOpenClock('start')">
+              <span id="qcTimeStartLbl">10:00</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+            </button>
+          </div>
+          <div class="qc-field"><label class="qc-lbl">สิ้นสุด</label>
+            <button type="button" class="qc-picker-btn" onclick="qcOpenClock('end')">
+              <span id="qcTimeEndLbl">11:00</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="qc-field"><label class="qc-lbl">สถานที่</label><input class="qc-in" placeholder="ระบุสถานที่ หรือ link ประชุม"/></div>
+        <div class="qc-field"><label class="qc-lbl">รายละเอียด</label><textarea class="qc-in qc-ta" placeholder="รายละเอียดเพิ่มเติม..."></textarea></div>
+        <div class="qc-field">
+          <label class="qc-lbl">แจ้งเตือน (ไม่บังคับ)</label>
+          <select class="qc-in qc-sel">
+            <option>ไม่แจ้งเตือน</option>
+            <option>10 นาทีก่อน</option>
+            <option>30 นาทีก่อน</option>
+            <option>1 ชั่วโมงก่อน</option>
+            <option>1 วันก่อน</option>
+          </select>
+        </div>
+        <div class="qc-field">
+          <label class="qc-lbl">รูปภาพ (หลายรูปได้)</label>
+          <div class="qc-pick">
+            <label class="qc-photo-btn" for="qcCam"><span class="qc-photo-ico">📷</span>Camera</label>
+            <label class="qc-photo-btn" for="qcGal"><span class="qc-photo-ico">🖼️</span>Photos</label>
+          </div>
+          <input id="qcCam" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcAddPics(event)"/>
+          <input id="qcGal" type="file" accept="image/*" multiple style="display:none" onchange="qcAddPics(event)"/>
+          <div class="qc-grid" id="qcPics"></div>
+        </div>
+        <button class="qc-btn" onclick="qcSave()" style="margin-top: 20px; font-size: 16px; padding: 16px;">บันทึก event</button>
+      </div>
+    </div>
+
+    <!-- TIME PICKER -->
+    <div id="sc-clock" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <button class="qc-ico qc-back" onclick="qcGo('add')" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="qc-title" id="clockTitle">Select time</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-clock-wrap">
+        <div class="qc-tbox">
+          <div class="qc-tnum on" id="qcTnumH" onclick="qcSetMode('hour')">10</div>
+          <div class="qc-tsep">:</div>
+          <div class="qc-tnum" id="qcTnumM" onclick="qcSetMode('minute')">00</div>
+        </div>
+        <div class="qc-face" id="qcFace"></div>
+        <div class="qc-acts">
+          <button class="qc-btn qc-btn-sm qc-btn-danger" onclick="qcGo('add')" style="margin: 0;">ยกเลิก</button>
+          <button class="qc-btn qc-btn-sm" onclick="qcSaveTime()" style="margin: 0;">ตกลง</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATE PICKER (for form) -->
+    <div id="sc-pickDate" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <button class="qc-ico qc-back" onclick="qcGo('add')" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="qc-title" id="dateTitle">เลือกวันที่</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-body">
+        <div class="qc-calw">
+          <div class="qc-ch">
+            <button class="qc-cn" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <div class="qc-cm">เมษายน 2569</div>
+            <button class="qc-cn" aria-label="Next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+          </div>
+          <div class="qc-cg" id="qcDpGrid"></div>
+        </div>
+        <div class="qc-acts" style="margin-top: 20px;">
+          <button class="qc-btn qc-btn-sm qc-btn-danger" onclick="qcGo('add')" style="margin: 0;">ยกเลิก</button>
+          <button class="qc-btn qc-btn-sm" onclick="qcSaveDate()" style="margin: 0;">ตกลง</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDIT - DATE SELECTOR -->
+    <div id="sc-editDate" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <button class="qc-ico qc-back" onclick="qcGo('home')" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="qc-title">แก้ไข / ลบ</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-body">
+        <div style="font-size: 13px; color: var(--navy); margin-bottom: 12px;">เลือกวันที่มี event เพื่อดูรายการ</div>
+        <div class="qc-calw">
+          <div class="qc-ch">
+            <button class="qc-cn" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <div class="qc-cm">เมษายน 2569</div>
+            <button class="qc-cn" aria-label="Next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+          </div>
+          <div class="qc-cg" id="qcCalGrid"></div>
+        </div>
+        <div class="qc-note">จุดสีทองใต้วันที่ = วันที่มี event</div>
+      </div>
+    </div>
+
+    <!-- EDIT - EVENT LIST -->
+    <div id="sc-editList" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <button class="qc-ico qc-back" onclick="qcGo('editDate')" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="qc-title">24 เมษายน 2569</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-body">
+        <div class="qc-sec">Events วันนี้ (2)</div>
+        <div class="qc-card">
+          <div class="qc-ev-title">ประชุมเอกสารนิติเวช</div>
+          <div class="qc-ev-meta">14:00 — 15:00</div>
+          <span class="qc-chip qc-chip-me">ปฏิทินของฉัน</span>
+          <div class="qc-acts">
+            <button class="qc-btn qc-btn-sm" onclick="qcGoEdit()">แก้ไข</button>
+            <button class="qc-btn qc-btn-sm qc-btn-danger" onclick="qcShowDel('ประชุมเอกสารนิติเวช')">ลบ</button>
+          </div>
+        </div>
+        <div class="qc-card">
+          <div class="qc-ev-title">รับลูกจากโรงเรียน</div>
+          <div class="qc-ev-meta">16:30 — 17:00</div>
+          <span class="qc-chip qc-chip-kid">ปฏิทินลูก</span>
+          <div class="qc-acts">
+            <button class="qc-btn qc-btn-sm" onclick="qcGoEdit()">แก้ไข</button>
+            <button class="qc-btn qc-btn-sm qc-btn-danger" onclick="qcShowDel('รับลูกจากโรงเรียน')">ลบ</button>
+          </div>
+        </div>
+        <div class="qc-note">ดูรายละเอียดเต็มได้ที่ Google Calendar</div>
+      </div>
+    </div>
+
+    <!-- LOADING -->
+    <div id="sc-loading" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <div style="width: 32px;"></div>
+        <span class="qc-title">กำลังบันทึก</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-ld">
+        <div class="qc-sp"></div>
+        <div class="qc-ld-t">กำลังบันทึก event...</div>
+        <div class="qc-step done" id="s1"><span class="qc-sd"></span><span>อัปโหลดรูปภาพ</span></div>
+        <div class="qc-step active" id="s2"><span class="qc-sd"></span><span>กำลังสร้าง event</span></div>
+        <div class="qc-step" id="s3"><span class="qc-sd"></span><span>เสร็จสิ้น</span></div>
+      </div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div id="sc-success" class="qc-sc" style="display:none;">
+      <div class="qc-hdr">
+        <div style="width: 32px;"></div>
+        <span class="qc-title">เสร็จสิ้น</span>
+        <div style="width: 32px;"></div>
+      </div>
+      <div class="qc-suc">
+        <div class="qc-ck"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="qc-suc-t">บันทึกสำเร็จ</div>
+        <div class="qc-suc-c">
+          <div class="qc-suc-r"><span>กิจกรรม</span><span>นัดหมอฟัน</span></div>
+          <div class="qc-suc-r"><span>วันเวลา</span><span>25 เม.ย. 10:00</span></div>
+          <div class="qc-suc-r"><span>ปฏิทิน</span><span>ปฏิทินของฉัน</span></div>
+          <div class="qc-suc-r"><span>รูปภาพ</span><span>2 รูป</span></div>
+        </div>
+        <button class="qc-btn" onclick="qcGo('add')">+ เพิ่มอีก event</button>
+        <button class="qc-btn" onclick="qcGo('home')">กลับหน้าแรก</button>
+      </div>
+    </div>
+
+    <!-- DELETE CONFIRM MODAL -->
+    <div class="qc-modal" id="qcDelModal">
+      <div class="qc-modal-box">
+        <div class="qc-modal-title">ยืนยันการลบ event</div>
+        <div class="qc-modal-msg" id="qcDelMsg">event นี้จะถูกลบถาวร</div>
+        <div class="qc-modal-acts">
+          <button class="qc-btn qc-btn-sm" onclick="qcHideDel()" style="margin: 0;">ยกเลิก</button>
+          <button class="qc-btn qc-btn-sm qc-btn-danger" onclick="qcDoDel()" style="margin: 0;">ลบ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST MODAL -->
+    <div class="qc-modal" id="qcToast">
+      <div class="qc-modal-box" style="max-width: 240px;">
+        <div class="qc-modal-title" id="qcToastMsg">ลบเรียบร้อย</div>
+        <button class="qc-btn qc-btn-sm" onclick="qcHideToast()" style="margin-top: 12px;">OK</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="qc-help">Tip — แตะช่องวันที่/เวลาเพื่อเปิด picker</div>
+</div>
+
+<script>
+(function(){
+  const state = { pics: [], delTarget: '' };
+  const tp = { hour: 10, minute: 0, mode: 'hour', target: 'start', times: { start: {h:10,m:0}, end: {h:11,m:0} } };
+  const dp = { target: 'start', day: 25, dates: { start: 25, end: 25 } };
+
+  function fmtDate(d) { return String(d).padStart(2, '0') + '/04/2026'; }
+  function fmtTime(h, m) { return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+  function minutesOf(h, m) { return h * 60 + m; }
+  function addHour(h, m) {
+    let nh = h + 1, nm = m;
+    if (nh >= 24) { nh = 23; nm = 59; }
+    return { h: nh, m: nm };
+  }
+
+  window.qcGo = function(s) {
+    document.querySelectorAll('.qc-sc').forEach(el => el.style.display = 'none');
+    const el = document.getElementById('sc-' + s);
+    if (el) el.style.display = 'block';
+    if (s === 'add') document.getElementById('addTitle').textContent = 'เพิ่ม event';
+  };
+  window.qcGoEdit = function() {
+    qcGo('add');
+    document.getElementById('addTitle').textContent = 'แก้ไข event';
+  };
+
+  window.qcAddPics = function(ev) {
+    Array.from(ev.target.files || []).forEach(f => state.pics.push(URL.createObjectURL(f)));
+    renderPics();
+    ev.target.value = '';
+  };
+  window.qcDelPic = function(i) { state.pics.splice(i, 1); renderPics(); };
+  function renderPics() {
+    const g = document.getElementById('qcPics');
+    g.innerHTML = state.pics.map((u, i) =>
+      '<div class="qc-thumb"><img src="' + u + '" alt=""><button class="qc-x" onclick="qcDelPic(' + i + ')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>'
+    ).join('');
+  }
+
+  window.qcOpenClock = function(target) {
+    tp.target = target;
+    const t = tp.times[target];
+    tp.hour = t.h; tp.minute = t.m; tp.mode = 'hour';
+    document.getElementById('clockTitle').textContent = target === 'start' ? 'เวลาเริ่ม' : 'เวลาสิ้นสุด';
+    renderClockUI();
+    qcGo('clock');
+  };
+  window.qcSetMode = function(m) { tp.mode = m; renderClockUI(); };
+  window.qcSaveTime = function() {
+    if (tp.target === 'start') {
+      tp.times.start = { h: tp.hour, m: tp.minute };
+      document.getElementById('qcTimeStartLbl').textContent = fmtTime(tp.hour, tp.minute);
+      const autoEnd = addHour(tp.hour, tp.minute);
+      tp.times.end = autoEnd;
+      document.getElementById('qcTimeEndLbl').textContent = fmtTime(autoEnd.h, autoEnd.m);
+    } else {
+      const sameDay = dp.dates.start === dp.dates.end;
+      const startMin = minutesOf(tp.times.start.h, tp.times.start.m);
+      const endMin = minutesOf(tp.hour, tp.minute);
+      if (sameDay && endMin <= startMin) {
+        const auto = addHour(tp.times.start.h, tp.times.start.m);
+        tp.times.end = auto;
+        document.getElementById('qcTimeEndLbl').textContent = fmtTime(auto.h, auto.m);
+      } else {
+        tp.times.end = { h: tp.hour, m: tp.minute };
+        document.getElementById('qcTimeEndLbl').textContent = fmtTime(tp.hour, tp.minute);
+      }
+    }
+    qcGo('add');
+  };
+
+  function renderClockUI() {
+    document.getElementById('qcTnumH').textContent = String(tp.hour).padStart(2, '0');
+    document.getElementById('qcTnumM').textContent = String(tp.minute).padStart(2, '0');
+    document.getElementById('qcTnumH').className = 'qc-tnum' + (tp.mode === 'hour' ? ' on' : '');
+    document.getElementById('qcTnumM').className = 'qc-tnum' + (tp.mode === 'minute' ? ' on' : '');
+    renderFace();
+  }
+  function renderFace() {
+    const face = document.getElementById('qcFace');
+    face.innerHTML = '';
+    const cx = 130, cy = 130, rOut = 105, rIn = 70;
+    if (tp.mode === 'hour') {
+      for (let i = 0; i < 12; i++) {
+        const a = (i * 30 - 90) * Math.PI / 180;
+        const xo = cx + rOut * Math.cos(a), yo = cy + rOut * Math.sin(a);
+        const elo = document.createElement('div');
+        elo.className = 'qc-cnum' + (i === tp.hour ? ' sel' : '');
+        elo.style.left = xo + 'px'; elo.style.top = yo + 'px';
+        elo.textContent = String(i).padStart(2, '0');
+        elo.onclick = () => { tp.hour = i; tp.mode = 'minute'; renderClockUI(); };
+        face.appendChild(elo);
+        const xi = cx + rIn * Math.cos(a), yi = cy + rIn * Math.sin(a);
+        const eli = document.createElement('div');
+        const inner = i + 12;
+        eli.className = 'qc-cnum qc-cnum-inner' + (inner === tp.hour ? ' sel' : '');
+        eli.style.left = xi + 'px'; eli.style.top = yi + 'px';
+        eli.textContent = String(inner).padStart(2, '0');
+        eli.onclick = () => { tp.hour = inner; tp.mode = 'minute'; renderClockUI(); };
+        face.appendChild(eli);
+      }
+    } else {
+      for (let i = 0; i < 12; i++) {
+        const m = i * 5;
+        const a = (i * 30 - 90) * Math.PI / 180;
+        const x = cx + rOut * Math.cos(a), y = cy + rOut * Math.sin(a);
+        const el = document.createElement('div');
+        el.className = 'qc-cnum' + (m === tp.minute ? ' sel' : '');
+        el.style.left = x + 'px'; el.style.top = y + 'px';
+        el.textContent = String(m).padStart(2, '0');
+        el.onclick = () => { tp.minute = m; renderClockUI(); };
+        face.appendChild(el);
+      }
+    }
+    const line = document.createElement('div');
+    line.className = 'qc-cline';
+    let handLen, ang;
+    if (tp.mode === 'hour') {
+      handLen = tp.hour < 12 ? rOut : rIn;
+      ang = ((tp.hour % 12) * 30 - 90);
+    } else {
+      handLen = rOut;
+      ang = ((tp.minute / 5) * 30 - 90);
+    }
+    line.style.width = handLen + 'px';
+    line.style.transform = 'rotate(' + ang + 'deg)';
+    face.appendChild(line);
+    const dot = document.createElement('div');
+    dot.className = 'qc-cdot';
+    face.appendChild(dot);
+  }
+
+  window.qcOpenDate = function(target) {
+    dp.target = target;
+    if (target === 'end' && dp.dates.end < dp.dates.start) dp.dates.end = dp.dates.start;
+    dp.day = dp.dates[target];
+    document.getElementById('dateTitle').textContent = target === 'start' ? 'วันที่เริ่ม' : 'ถึงวันที่';
+    renderDpGrid();
+    qcGo('pickDate');
+  };
+  window.qcSaveDate = function() {
+    if (dp.target === 'start') {
+      dp.dates.start = dp.day;
+      document.getElementById('qcDateStartLbl').textContent = fmtDate(dp.day);
+      if (dp.dates.end < dp.dates.start) {
+        dp.dates.end = dp.dates.start;
+        document.getElementById('qcDateEndLbl').textContent = fmtDate(dp.dates.start);
+      }
+    } else {
+      dp.dates.end = dp.day;
+      document.getElementById('qcDateEndLbl').textContent = fmtDate(dp.day);
+    }
+    qcGo('add');
+  };
+
+  function buildCal(gridId, clickHandler, minDay) {
+    minDay = minDay || 0;
+    const grid = document.getElementById(gridId);
+    if (!grid) return null;
+    grid.innerHTML = '';
+    const dows = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+    dows.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'qc-dow';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+    const startOffset = 3;
+    const daysInMonth = 30;
+    const hasEv = [4, 10, 15, 23, 24, 25, 28, 30];
+    for (let i = 0; i < startOffset; i++) {
+      const el = document.createElement('div');
+      el.className = 'qc-day';
+      el.style.visibility = 'hidden';
+      grid.appendChild(el);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const el = document.createElement('div');
+      const isDisabled = d < minDay;
+      el.className = 'qc-day' + (hasEv.includes(d) ? ' ev' : '') + (isDisabled ? ' disabled' : '');
+      el.dataset.day = d;
+      el.textContent = d;
+      if (!isDisabled) el.onclick = () => clickHandler(d, grid);
+      grid.appendChild(el);
+    }
+    return grid;
+  }
+
+  function renderDpGrid() {
+    const minDay = dp.target === 'end' ? dp.dates.start : 0;
+    const grid = buildCal('qcDpGrid', (d, g) => {
+      dp.day = d;
+      g.querySelectorAll('.qc-day').forEach(e => e.classList.remove('sel'));
+      const target = g.querySelector('[data-day="' + d + '"]');
+      if (target) target.classList.add('sel');
+    }, minDay);
+    if (grid) {
+      const sel = grid.querySelector('[data-day="' + dp.day + '"]');
+      if (sel && !sel.classList.contains('disabled')) sel.classList.add('sel');
+    }
+  }
+  buildCal('qcCalGrid', (d) => {
+    if ([4, 10, 15, 23, 24, 25, 28, 30].includes(d)) qcGo('editList');
+  }, 0);
+  const calGrid = document.getElementById('qcCalGrid');
+  if (calGrid) {
+    const sel24 = calGrid.querySelector('[data-day="24"]');
+    if (sel24) sel24.classList.add('sel');
+  }
+
+  window.qcShowDel = function(name) {
+    state.delTarget = name;
+    document.getElementById('qcDelMsg').textContent = '"' + name + '" จะถูกลบถาวร';
+    document.getElementById('qcDelModal').classList.add('on');
+  };
+  window.qcHideDel = function() {
+    document.getElementById('qcDelModal').classList.remove('on');
+  };
+  window.qcDoDel = function() {
+    qcHideDel();
+    document.getElementById('qcToastMsg').textContent = 'ลบ "' + state.delTarget + '" แล้ว';
+    document.getElementById('qcToast').classList.add('on');
+    setTimeout(() => qcGo('editDate'), 100);
+  };
+  window.qcHideToast = function() {
+    document.getElementById('qcToast').classList.remove('on');
+  };
+
+  window.qcSave = function() {
+    qcGo('loading');
+    setTimeout(() => {
+      const s2 = document.getElementById('s2');
+      s2.className = 'qc-step done';
+      s2.querySelector('span:last-child').textContent = 'สร้าง event สำเร็จ';
+      document.getElementById('s3').className = 'qc-step active';
+    }, 1000);
+    setTimeout(() => {
+      const s3 = document.getElementById('s3');
+      s3.className = 'qc-step done';
+      s3.querySelector('span:last-child').textContent = 'เสร็จสิ้น';
+    }, 1800);
+    setTimeout(() => {
+      qcGo('success');
+      const s2 = document.getElementById('s2');
+      s2.className = 'qc-step active';
+      s2.querySelector('span:last-child').textContent = 'กำลังสร้าง event';
+      const s3 = document.getElementById('s3');
+      s3.className = 'qc-step';
+      s3.querySelector('span:last-child').textContent = 'เสร็จสิ้น';
+    }, 2300);
+  };
+})();
+</script>
+
+</body>
+</html>
