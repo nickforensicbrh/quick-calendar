@@ -6,7 +6,7 @@ import {
   renderUpcomingEvents, renderUpcomingLoading, renderUpcomingError,
   renderForm, updatePickerLabels, showFormError, clearFormError,
   renderDatePicker, renderTimePicker, renderPhotos, renderColorPicker,
-  renderEditDateSelector, renderEditList,
+  renderEditDateSelector, renderDuplicateDateSelector, renderInlineEventList,
   setLoadingStep, renderSuccessSummary,
 } from './ui.js';
 import {
@@ -33,7 +33,52 @@ const state = {
   deletingEvent: null,
   upcomingEvents: [],
   monthEvents: new Map(),
+  duplicateDateMonth: null,
+  duplicateMonthEvents: new Map(),
+  duplicateListDate: null,
 };
+
+// ---- Swipe gesture (calendar grids) ----
+
+// 50px threshold; |dx| must dominate |dy| to avoid hijacking vertical scroll.
+// suppressClickAfterSwipe gates day-click callbacks for 100ms after a swipe so
+// the trailing tap event doesn't double-fire as both swipe + day select.
+let suppressClickAfterSwipe = false;
+
+function bindSwipe(el, onLeft, onRight) {
+  if (!el) return;
+  let sx = 0, sy = 0, touchActive = false;
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { touchActive = false; return; }
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    touchActive = true;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (!touchActive) return;
+    touchActive = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      suppressClickAfterSwipe = true;
+      setTimeout(() => { suppressClickAfterSwipe = false; }, 100);
+      if (dx < 0) onLeft(); else onRight();
+    }
+  });
+
+  // Mouse drag — desktop testing parity.
+  let mx = 0, my = 0, dragging = false;
+  el.addEventListener('mousedown', (e) => { mx = e.clientX; my = e.clientY; dragging = true; });
+  el.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = e.clientX - mx, dy = e.clientY - my;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      suppressClickAfterSwipe = true;
+      setTimeout(() => { suppressClickAfterSwipe = false; }, 100);
+      if (dx < 0) onLeft(); else onRight();
+    }
+  });
+}
 
 // ---- Screen + modal helpers ----
 
@@ -156,10 +201,59 @@ function doSignOut() {
   state.calendars = [];
   state.upcomingEvents = [];
   state.monthEvents = new Map();
+  state.editListDate = null;
+  state.duplicateDateMonth = null;
+  state.duplicateMonthEvents = new Map();
+  state.duplicateListDate = null;
   showScreen('welcome');
 }
 
 // ---- Form init ----
+
+// Duration tracking: when the user changes START, end shifts to preserve the
+// last-known duration; when the user changes END, duration is recaptured. Both
+// ms and days are stored so toggling allDay has a sensible default for the
+// newly-active mode without recomputing from history.
+const DEFAULT_DURATION_MS = 3600000;     // 1 hour
+const DEFAULT_DURATION_DAYS = 0;          // single-day all-day = "1 day"
+
+const clampPlusHour = (h, m) => (h + 1 >= 24) ? { h: 23, m: 59 } : { h: h + 1, m };
+
+function localDateTime(isoDate, time) {
+  const [y, mo, d] = isoDate.split('-').map(Number);
+  return new Date(y, mo - 1, d, time.h, time.m, 0);
+}
+
+function daysBetweenISO(startISO, endISO) {
+  const [sy, sm, sd] = startISO.split('-').map(Number);
+  const [ey, em, ed] = endISO.split('-').map(Number);
+  const s = new Date(sy, sm - 1, sd);
+  const e = new Date(ey, em - 1, ed);
+  return Math.round((e - s) / 86400000);
+}
+
+function applyDurationToEnd() {
+  const f = state.formData;
+  if (f.allDay) {
+    f.endDate = addDaysISO(f.startDate, Math.max(0, f.durationDays | 0));
+  } else {
+    const startDT = localDateTime(f.startDate, f.startTime);
+    const endDT = new Date(startDT.getTime() + Math.max(0, f.durationMs || 0));
+    f.endDate = dateToISO(endDT);
+    f.endTime = { h: endDT.getHours(), m: endDT.getMinutes() };
+  }
+}
+
+function recaptureDuration() {
+  const f = state.formData;
+  if (f.allDay) {
+    f.durationDays = Math.max(0, daysBetweenISO(f.startDate, f.endDate));
+  } else {
+    const startDT = localDateTime(f.startDate, f.startTime);
+    const endDT = localDateTime(f.endDate, f.endTime);
+    f.durationMs = Math.max(0, endDT.getTime() - startDT.getTime());
+  }
+}
 
 function revokePriorBlobs() {
   if (state.formData?.photos) {
@@ -190,6 +284,9 @@ function initNewForm() {
     colorId: null,
     photos: [],
     attachments: [],
+    duplicateSourceHadAttachments: false,
+    durationMs: DEFAULT_DURATION_MS,
+    durationDays: DEFAULT_DURATION_DAYS,
   };
   document.getElementById('fCalendar').disabled = false;
   renderForm(state);
@@ -235,6 +332,15 @@ function eventToFormData(event, calendarId) {
     mimeType: a.mimeType || '',
     iconLink: a.iconLink || '',
   }));
+  // Capture duration in BOTH units. Active mode uses the matching one; the
+  // inactive one falls back to a sane default (1hr) so allDay-toggle works.
+  const durationDays = Math.max(0, daysBetweenISO(startDate, endDate));
+  let durationMs = DEFAULT_DURATION_MS;
+  if (!allDay) {
+    const sDT = localDateTime(startDate, startTime);
+    const eDT = localDateTime(endDate, endTime);
+    durationMs = Math.max(0, eDT.getTime() - sDT.getTime());
+  }
   return {
     title: event.summary || '',
     calendarId,
@@ -245,6 +351,9 @@ function eventToFormData(event, calendarId) {
     colorId: event.colorId || null,
     photos,
     attachments,
+    duplicateSourceHadAttachments: false,
+    durationMs,
+    durationDays,
   };
 }
 
@@ -258,6 +367,26 @@ function openEditEvent(event, entry = 'home') {
   state.formData = eventToFormData(event, event.calendarId);
   // Calendar move requires delete+create — out of scope; lock the select
   document.getElementById('fCalendar').disabled = true;
+  renderForm(state);
+  showScreen('add');
+}
+
+function openDuplicateEvent(event) {
+  if (!event?.id || !event?.calendarId) return;
+  revokePriorBlobs();
+  // Duplicate creates a new event → formMode='create' so submit POSTs.
+  // formEntry='duplicate' drives back routing, form labels, success buttons.
+  state.formMode = 'create';
+  state.formEntry = 'duplicate';
+  state.editingEvent = null;
+  state.photosToDelete = [];
+  state.formData = eventToFormData(event, event.calendarId);
+  // Drop native Calendar attachments[] (tied to original; copy needs Drive perms).
+  // Surface a one-line note in the form when source had any.
+  const hadAttachments = state.formData.attachments.length > 0;
+  state.formData.attachments = [];
+  state.formData.duplicateSourceHadAttachments = hadAttachments;
+  document.getElementById('fCalendar').disabled = false;
   renderForm(state);
   showScreen('add');
 }
@@ -307,14 +436,15 @@ function rebindDatePicker() {
 
 function saveDatePicker() {
   const { target, selectedDate } = state.datePicker;
+  const f = state.formData;
   if (target === 'start') {
-    state.formData.startDate = selectedDate;
-    // Auto-adjust rule 1: endDate < startDate → bump silently
-    if (state.formData.endDate < state.formData.startDate) {
-      state.formData.endDate = state.formData.startDate;
-    }
+    f.startDate = selectedDate;
+    applyDurationToEnd();
+    // Defensive: if duration somehow leaves end before start, snap end = start
+    if (f.endDate < f.startDate) f.endDate = f.startDate;
   } else {
-    state.formData.endDate = selectedDate;
+    f.endDate = selectedDate;
+    recaptureDuration();
   }
   updatePickerLabels(state);
   showScreen('add');
@@ -354,21 +484,28 @@ function rebindTimePicker() {
 
 function saveTimePicker() {
   const { target, hour, minute } = state.timePicker;
-  const clampPlusHour = (h, m) => (h + 1 >= 24) ? { h: 23, m: 59 } : { h: h + 1, m };
+  const f = state.formData;
   if (target === 'start') {
-    state.formData.startTime = { h: hour, m: minute };
-    // Rule 3: endTime always = startTime + 1h (clamped)
-    state.formData.endTime = clampPlusHour(hour, minute);
+    f.startTime = { h: hour, m: minute };
+    // Shift end by stored duration (replaces former rule 3 hard-coded +1hr)
+    applyDurationToEnd();
+    // Defensive (former rule 4): if same-day duration is 0/negative, fall back to +1h
+    if (f.startDate === f.endDate) {
+      const sMin = f.startTime.h * 60 + f.startTime.m;
+      const eMin = f.endTime.h * 60 + f.endTime.m;
+      if (eMin <= sMin) f.endTime = clampPlusHour(f.startTime.h, f.startTime.m);
+    }
   } else {
-    const sameDay = state.formData.startDate === state.formData.endDate;
-    const sMin = state.formData.startTime.h * 60 + state.formData.startTime.m;
+    const sameDay = f.startDate === f.endDate;
+    const sMin = f.startTime.h * 60 + f.startTime.m;
     const eMin = hour * 60 + minute;
     if (sameDay && eMin <= sMin) {
       // Rule 4: overwrite with startTime + 1h
-      state.formData.endTime = clampPlusHour(state.formData.startTime.h, state.formData.startTime.m);
+      f.endTime = clampPlusHour(f.startTime.h, f.startTime.m);
     } else {
-      state.formData.endTime = { h: hour, m: minute };
+      f.endTime = { h: hour, m: minute };
     }
+    recaptureDuration();
   }
   updatePickerLabels(state);
   showScreen('add');
@@ -484,6 +621,8 @@ async function submitEvent() {
     renderSuccessSummary(saved, calendar, allLinks.length);
     document.getElementById('successBackToEditList').style.display =
       state.formEntry === 'edit-list' ? '' : 'none';
+    document.getElementById('successBackToDup').style.display =
+      state.formEntry === 'duplicate' ? '' : 'none';
     showScreen('success');
     loadHomeData();
   } catch (err) {
@@ -492,20 +631,49 @@ async function submitEvent() {
   }
 }
 
-// ---- Edit Date Selector + Edit List + Delete ----
+// ---- Edit/Delete (merged screen) + Duplicate Date Selector ----
 
 function openEditDateSelector() {
   if (!state.editDateMonth) {
     const t = new Date();
     state.editDateMonth = { viewYear: t.getFullYear(), viewMonth: t.getMonth() };
   }
+  state.editListDate = null;
+  document.getElementById('editEventList').replaceChildren();
   showScreen('edit-date');
   rebindEditDateSelector();
   loadMonthEvents();
 }
 
 function rebindEditDateSelector() {
-  renderEditDateSelector(state, { onDayClick: openEditList });
+  renderEditDateSelector(state, { onDayClick: handleEditDayClick });
+}
+
+function handleEditDayClick(isoDate) {
+  if (suppressClickAfterSwipe) return;
+  selectEditDate(isoDate);
+}
+
+function selectEditDate(isoDate) {
+  state.editListDate = isoDate;
+  rebindEditDateSelector();
+  renderInlineEditList();
+}
+
+function renderInlineEditList() {
+  const date = state.editListDate;
+  const events = date ? (state.monthEvents.get(date) || []) : null;
+  renderInlineEventList({
+    container: document.getElementById('editEventList'),
+    events,
+    calendars: state.calendars,
+    mode: 'edit',
+    dateLabel: date ? formatThaiDateLong(date) : null,
+    callbacks: {
+      onEdit: (e) => openEditEvent(e, 'edit-list'),
+      onDelete: showDeleteConfirm,
+    },
+  });
 }
 
 async function loadMonthEvents() {
@@ -516,6 +684,7 @@ async function loadMonthEvents() {
     const events = await withFreshToken(() => listMonthEvents(state.accessToken, state.calendars, viewYear, viewMonth));
     state.monthEvents = groupEventsByDate(events);
     rebindEditDateSelector();
+    renderInlineEditList();
   } catch (err) {
     showToast(friendlyApiError(err));
   } finally {
@@ -529,18 +698,90 @@ function navMonthEditDate(delta) {
   if (m.viewMonth < 0) { m.viewMonth = 11; m.viewYear -= 1; }
   else if (m.viewMonth > 11) { m.viewMonth = 0; m.viewYear += 1; }
   state.monthEvents = new Map();
+  state.editListDate = null;
+  document.getElementById('editEventList').replaceChildren();
   rebindEditDateSelector();
   loadMonthEvents();
 }
 
-function openEditList(isoDate) {
-  state.editListDate = isoDate;
-  const events = state.monthEvents.get(isoDate) || [];
-  renderEditList(events, state.calendars, formatThaiDateLong(isoDate), {
-    onEdit: (e) => openEditEvent(e, 'edit-list'),
-    onDelete: showDeleteConfirm,
+// ---- Duplicate Date Selector ----
+
+function openDuplicateDateSelector() {
+  if (!state.duplicateDateMonth) {
+    const t = new Date();
+    state.duplicateDateMonth = { viewYear: t.getFullYear(), viewMonth: t.getMonth() };
+  }
+  state.duplicateListDate = null;
+  document.getElementById('dupEventList').replaceChildren();
+  showScreen('duplicate-date');
+  rebindDuplicateDateSelector();
+  loadMonthEventsDup();
+}
+
+function rebindDuplicateDateSelector() {
+  renderDuplicateDateSelector(state, { onDayClick: handleDupDayClick });
+}
+
+function handleDupDayClick(isoDate) {
+  if (suppressClickAfterSwipe) return;
+  selectDuplicateDate(isoDate);
+}
+
+function selectDuplicateDate(isoDate) {
+  state.duplicateListDate = isoDate;
+  rebindDuplicateDateSelector();
+  renderInlineDupList();
+}
+
+function renderInlineDupList() {
+  const date = state.duplicateListDate;
+  const events = date ? (state.duplicateMonthEvents.get(date) || []) : null;
+  renderInlineEventList({
+    container: document.getElementById('dupEventList'),
+    events,
+    calendars: state.calendars,
+    mode: 'duplicate',
+    dateLabel: date ? formatThaiDateLong(date) : null,
+    callbacks: { onDuplicate: openDuplicateEvent },
   });
-  showScreen('edit-list');
+}
+
+async function loadMonthEventsDup() {
+  const loader = document.getElementById('dupDateLoading');
+  if (loader) loader.style.display = 'block';
+  try {
+    const { viewYear, viewMonth } = state.duplicateDateMonth;
+    const events = await withFreshToken(() => listMonthEvents(state.accessToken, state.calendars, viewYear, viewMonth));
+    state.duplicateMonthEvents = groupEventsByDate(events);
+    rebindDuplicateDateSelector();
+    renderInlineDupList();
+  } catch (err) {
+    showToast(friendlyApiError(err));
+  } finally {
+    if (loader) loader.style.display = 'none';
+  }
+}
+
+function navMonthDuplicate(delta) {
+  const m = state.duplicateDateMonth;
+  m.viewMonth += delta;
+  if (m.viewMonth < 0) { m.viewMonth = 11; m.viewYear -= 1; }
+  else if (m.viewMonth > 11) { m.viewMonth = 0; m.viewYear += 1; }
+  state.duplicateMonthEvents = new Map();
+  state.duplicateListDate = null;
+  document.getElementById('dupEventList').replaceChildren();
+  rebindDuplicateDateSelector();
+  loadMonthEventsDup();
+}
+
+function jumpToTodayDup() {
+  const t = new Date();
+  state.duplicateDateMonth = { viewYear: t.getFullYear(), viewMonth: t.getMonth() };
+  state.duplicateMonthEvents = new Map();
+  state.duplicateListDate = null;
+  document.getElementById('dupEventList').replaceChildren();
+  rebindDuplicateDateSelector();
+  loadMonthEventsDup();
 }
 
 function showDeleteConfirm(event) {
@@ -579,7 +820,6 @@ async function confirmDelete() {
 
   showToast(`ลบ "${event.summary || '(ไม่มีชื่อ)'}" แล้ว`);
   await loadMonthEvents();
-  showScreen('edit-date');
   loadHomeData();
 }
 
@@ -593,6 +833,8 @@ function jumpToToday() {
   const t = new Date();
   state.editDateMonth = { viewYear: t.getFullYear(), viewMonth: t.getMonth() };
   state.monthEvents = new Map();
+  state.editListDate = null;
+  document.getElementById('editEventList').replaceChildren();
   rebindEditDateSelector();
   loadMonthEvents();
 }
@@ -610,7 +852,18 @@ function jumpDatePickerToToday() {
 }
 
 function formBack() {
-  showScreen(state.formEntry === 'edit-list' ? 'edit-list' : 'home');
+  // Cancel from form (no save): preserve list state, just navigate.
+  if (state.formEntry === 'duplicate') {
+    showScreen('duplicate-date');
+    rebindDuplicateDateSelector();
+    renderInlineDupList();
+  } else if (state.formEntry === 'edit-list') {
+    showScreen('edit-date');
+    rebindEditDateSelector();
+    renderInlineEditList();
+  } else {
+    showScreen('home');
+  }
 }
 
 function backToEditFlow() {
@@ -619,10 +872,26 @@ function backToEditFlow() {
     const [y, m] = date.split('-').map(Number);
     state.editDateMonth = { viewYear: y, viewMonth: m - 1 };
     state.monthEvents = new Map();
+    state.editListDate = date;
   }
+  document.getElementById('editEventList').replaceChildren();
   showScreen('edit-date');
   rebindEditDateSelector();
   loadMonthEvents();
+}
+
+function backToDuplicateFlow() {
+  const date = state.formData?.startDate;
+  if (date) {
+    const [y, m] = date.split('-').map(Number);
+    state.duplicateDateMonth = { viewYear: y, viewMonth: m - 1 };
+    state.duplicateMonthEvents = new Map();
+    state.duplicateListDate = date;
+  }
+  document.getElementById('dupEventList').replaceChildren();
+  showScreen('duplicate-date');
+  rebindDuplicateDateSelector();
+  loadMonthEventsDup();
 }
 
 function goHome() {
@@ -632,6 +901,8 @@ function goHome() {
     }
   }
   state.deletingEvent = null;
+  state.editListDate = null;
+  state.duplicateListDate = null;
   hideModal('confirmDeleteModal');
   hideModal('toastModal');
   hideModal('signOutModal');
@@ -651,13 +922,17 @@ function handleAction(action, el) {
     case 'confirm-delete': confirmDelete(); break;
     case 'dismiss-toast': hideModal('toastModal'); break;
     case 'open-edit-date': openEditDateSelector(); break;
+    case 'open-duplicate': openDuplicateDateSelector(); break;
     case 'prev-month-edit': navMonthEditDate(-1); break;
     case 'next-month-edit': navMonthEditDate(+1); break;
+    case 'prev-month-dup': navMonthDuplicate(-1); break;
+    case 'next-month-dup': navMonthDuplicate(+1); break;
     case 'jump-today': jumpToToday(); break;
+    case 'jump-today-dup': jumpToTodayDup(); break;
     case 'jump-today-picker': jumpDatePickerToToday(); break;
     case 'form-back': formBack(); break;
     case 'back-to-edit-flow': backToEditFlow(); break;
-    case 'back-to-edit-date': showScreen('edit-date'); rebindEditDateSelector(); break;
+    case 'back-to-duplicate-flow': backToDuplicateFlow(); break;
     case 'go-home': goHome(); break;
     case 'toggle-color-picker': document.getElementById('colorDropdown').classList.toggle('active'); break;
     case 'select-color': {
@@ -681,17 +956,34 @@ function handleAction(action, el) {
     case 'time-mode-hour': state.timePicker.mode = 'hour'; rebindTimePicker(); break;
     case 'time-mode-minute': state.timePicker.mode = 'minute'; rebindTimePicker(); break;
     case 'toggle-allday': {
-      // Auto-adjust rules 5 + 6: silent toggle of time pickers; times preserved across toggles
-      state.formData.allDay = document.getElementById('fAllDay').checked;
-      document.getElementById('fTimeRow').style.display = state.formData.allDay ? 'none' : '';
+      // Rules 5+6: silent toggle. Recompute the now-active duration so a
+      // subsequent start change shifts end correctly.
+      const f = state.formData;
+      const wasAllDay = f.allDay;
+      f.allDay = document.getElementById('fAllDay').checked;
+      document.getElementById('fTimeRow').style.display = f.allDay ? 'none' : '';
+      if (!wasAllDay && f.allDay) {
+        // timed → all-day: keep date span, refresh days from current dates
+        f.durationDays = Math.max(0, daysBetweenISO(f.startDate, f.endDate));
+      } else if (wasAllDay && !f.allDay) {
+        // all-day → timed: collapse to a single 1hr block (multi-day timed
+        // is rarely what the user wants here)
+        f.endDate = f.startDate;
+        f.endTime = clampPlusHour(f.startTime.h, f.startTime.m);
+        f.durationMs = DEFAULT_DURATION_MS;
+        updatePickerLabels(state);
+      }
       break;
     }
     case 'remove-photo': {
       const idx = Number(el.dataset.idx);
       const p = state.formData.photos[idx];
       if (p?.localUrl) URL.revokeObjectURL(p.localUrl);
-      // For existing Drive photos, queue for delete on save
-      if (p && !p.file && p.driveFileId) state.photosToDelete.push(p.driveFileId);
+      // For existing Drive photos in EDIT mode, queue for delete on save.
+      // In DUPLICATE mode the photos still belong to the source event — never queue.
+      if (p && !p.file && p.driveFileId && state.formMode === 'edit') {
+        state.photosToDelete.push(p.driveFileId);
+      }
       state.formData.photos.splice(idx, 1);
       renderPhotos(state.formData.photos, state.formData.attachments);
       break;
@@ -781,6 +1073,8 @@ async function bootstrap() {
   setupServiceWorker();
   initPhotoInputs();
   setupInstall();
+  bindSwipe(document.getElementById('editDateGrid'), () => navMonthEditDate(+1), () => navMonthEditDate(-1));
+  bindSwipe(document.getElementById('dupDateGrid'),  () => navMonthDuplicate(+1), () => navMonthDuplicate(-1));
   try {
     await initAuth();
     const btn = document.getElementById('signInBtn');

@@ -82,7 +82,13 @@ export function renderForm(state) {
   updatePickerLabels(state);
   renderPhotos(state.formData.photos || [], state.formData.attachments || []);
   renderColorPicker(state);
-  document.getElementById('addTitle').textContent = state.formMode === 'edit' ? 'แก้ไข event' : 'เพิ่ม event';
+  const isDup = state.formEntry === 'duplicate';
+  const titleText = isDup ? 'ทำซ้ำ event' : (state.formMode === 'edit' ? 'แก้ไข event' : 'เพิ่ม event');
+  const submitText = isDup ? 'ทำซ้ำ event' : 'บันทึก event';
+  document.getElementById('addTitle').textContent = titleText;
+  document.getElementById('submitBtn').textContent = submitText;
+  document.getElementById('dupAttachmentsNote').style.display =
+    (isDup && state.formData.duplicateSourceHadAttachments) ? '' : 'none';
   clearFormError();
 }
 
@@ -286,7 +292,7 @@ export function renderDatePicker(state, { onDayClick } = {}) {
   });
 }
 
-// ---- Edit Date Selector ----
+// ---- Edit / Duplicate Date Selectors ----
 
 export function renderEditDateSelector(state, { onDayClick } = {}) {
   renderMonthCalendar({
@@ -294,36 +300,55 @@ export function renderEditDateSelector(state, { onDayClick } = {}) {
     monthLabel: document.getElementById('editDateMonth'),
     viewYear: state.editDateMonth.viewYear,
     viewMonth: state.editDateMonth.viewMonth,
+    selectedDate: state.editListDate,
     monthEvents: state.monthEvents,
     todayIso: todayISODate(),
     onDayClick,
   });
 }
 
-// ---- Edit List ----
+export function renderDuplicateDateSelector(state, { onDayClick } = {}) {
+  renderMonthCalendar({
+    container: document.getElementById('dupDateGrid'),
+    monthLabel: document.getElementById('dupDateMonth'),
+    viewYear: state.duplicateDateMonth.viewYear,
+    viewMonth: state.duplicateDateMonth.viewMonth,
+    selectedDate: state.duplicateListDate,
+    monthEvents: state.duplicateMonthEvents,
+    todayIso: todayISODate(),
+    onDayClick,
+  });
+}
 
-export function renderEditList(events, calendars, dateLabel, { onEdit, onDelete } = {}) {
-  document.getElementById('editListDate').textContent = dateLabel;
-  document.getElementById('editListHeading').textContent = `Events (${events.length})`;
-  const list = document.getElementById('editListItems');
-  list.replaceChildren();
+// ---- Inline event list (rendered below calendar on edit/duplicate screens) ----
+
+export function renderInlineEventList({ container, events, calendars, mode, dateLabel, callbacks = {} }) {
+  container.replaceChildren();
+  if (events == null) return;
+
+  if (dateLabel) {
+    const heading = document.createElement('div');
+    heading.className = 'section-heading';
+    heading.textContent = `${dateLabel} (${events.length})`;
+    container.appendChild(heading);
+  }
 
   if (events.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'card-meta';
     empty.style.cssText = 'padding: 12px; text-align: center;';
     empty.textContent = 'ไม่มี event ในวันนี้';
-    list.appendChild(empty);
+    container.appendChild(empty);
     return;
   }
 
   const calsById = new Map(calendars.map(c => [c.id, c]));
   for (const ev of events) {
-    list.appendChild(renderEditListCard(ev, calsById.get(ev.calendarId), onEdit, onDelete));
+    container.appendChild(renderInlineEventCard(ev, calsById.get(ev.calendarId), mode, callbacks));
   }
 }
 
-function renderEditListCard(event, calendar, onEdit, onDelete) {
+function renderInlineEventCard(event, calendar, mode, { onEdit, onDelete, onDuplicate }) {
   const card = document.createElement('div');
   card.className = 'card';
 
@@ -348,21 +373,31 @@ function renderEditListCard(event, calendar, onEdit, onDelete) {
   const acts = document.createElement('div');
   acts.className = 'action-row';
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'btn btn-sm';
-  editBtn.style.margin = '0';
-  editBtn.textContent = 'แก้ไข';
-  editBtn.addEventListener('click', () => onEdit?.(event));
-  acts.appendChild(editBtn);
+  if (mode === 'duplicate') {
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.className = 'btn btn-sm';
+    dupBtn.style.cssText = 'margin: 0; grid-column: 1 / -1;';
+    dupBtn.textContent = 'ทำซ้ำ';
+    dupBtn.addEventListener('click', () => onDuplicate?.(event));
+    acts.appendChild(dupBtn);
+  } else {
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn btn-sm';
+    editBtn.style.margin = '0';
+    editBtn.textContent = 'แก้ไข';
+    editBtn.addEventListener('click', () => onEdit?.(event));
+    acts.appendChild(editBtn);
 
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'btn btn-sm btn-danger';
-  delBtn.style.margin = '0';
-  delBtn.textContent = 'ลบ';
-  delBtn.addEventListener('click', () => onDelete?.(event));
-  acts.appendChild(delBtn);
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-sm btn-danger';
+    delBtn.style.margin = '0';
+    delBtn.textContent = 'ลบ';
+    delBtn.addEventListener('click', () => onDelete?.(event));
+    acts.appendChild(delBtn);
+  }
 
   card.appendChild(acts);
   return card;

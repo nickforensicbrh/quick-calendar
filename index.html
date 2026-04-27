@@ -47,7 +47,8 @@
       <div class="email-chip"><div class="email-dot"></div><span id="userEmail">you@gmail.com</span></div>
       <div class="greeting">สวัสดีครับ พร้อมบันทึกกิจกรรมวันนี้</div>
       <button class="btn" data-action="new-event">+ เพิ่ม</button>
-      <button class="btn" data-action="open-edit-date" style="margin-bottom: 20px;">แก้ไข / ลบ</button>
+      <button class="btn" data-action="open-edit-date">แก้ไข / ลบ</button>
+      <button class="btn" data-action="open-duplicate" style="margin-bottom: 20px;">ทำซ้ำ</button>
       <div class="section-heading">Event เร็วๆ นี้</div>
       <div id="upcomingEvents"></div>
     </div>
@@ -126,8 +127,9 @@
         <input id="fGal" type="file" accept="image/*" multiple style="display:none"/>
         <div class="photo-grid" id="fPics"></div>
       </div>
+      <div class="note" id="dupAttachmentsNote" style="display:none;">หมายเหตุ: ไฟล์แนบจาก Google Calendar (📎) จะไม่ถูกคัดลอก</div>
       <div class="error-banner" id="formError"></div>
-      <button class="btn" data-action="submit-event" style="margin-top: 20px; font-size: 16px; padding: 16px;">บันทึก event</button>
+      <button class="btn" id="submitBtn" data-action="submit-event" style="margin-top: 20px; font-size: 16px; padding: 16px;">บันทึก event</button>
     </div>
   </section>
 
@@ -198,7 +200,6 @@
       </button>
     </div>
     <div class="body">
-      <div style="font-size: 13px; color: var(--navy); margin-bottom: 12px;">เลือกวันที่มี event เพื่อดูรายการ</div>
       <div class="cal-wrap">
         <div class="cal-head">
           <button class="cal-nav" data-action="prev-month-edit" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -211,25 +212,35 @@
         <div class="cal-grid" id="editDateGrid"></div>
       </div>
       <div class="cal-loading" id="editDateLoading" style="display:none;">กำลังโหลด event...</div>
-      <div class="note">จุดสีทองใต้วันที่ = วันที่มี event</div>
+      <div id="editEventList"></div>
     </div>
   </section>
 
-  <!-- EDIT LIST -->
-  <section id="screen-edit-list" class="screen">
+  <!-- DUPLICATE DATE SELECTOR (mirrors edit-date) -->
+  <section id="screen-duplicate-date" class="screen">
     <div class="header">
-      <button class="icon-btn back" aria-label="Back" data-action="back-to-edit-date">
+      <button class="icon-btn back" aria-label="Back" data-nav="home">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <span class="header-title" id="editListDate">รายการ event</span>
+      <span class="header-title">ทำซ้ำ</span>
       <button class="icon-btn primary" aria-label="Home" data-action="go-home">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
       </button>
     </div>
     <div class="body">
-      <div class="section-heading" id="editListHeading">Events</div>
-      <div id="editListItems"></div>
-      <div class="note">ดูรายละเอียดเต็มได้ที่ Google Calendar</div>
+      <div class="cal-wrap">
+        <div class="cal-head">
+          <button class="cal-nav" data-action="prev-month-dup" aria-label="Previous"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div class="cal-month-wrap">
+            <div class="cal-month" id="dupDateMonth">—</div>
+            <button class="today-btn" data-action="jump-today-dup">วันนี้</button>
+          </div>
+          <button class="cal-nav" data-action="next-month-dup" aria-label="Next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+        <div class="cal-grid" id="dupDateGrid"></div>
+      </div>
+      <div class="cal-loading" id="dupDateLoading" style="display:none;">กำลังโหลด event...</div>
+      <div id="dupEventList"></div>
     </div>
   </section>
 
@@ -261,6 +272,7 @@
       </div>
       <button class="btn" data-action="new-event">+ เพิ่มอีก event</button>
       <button class="btn" id="successBackToEditList" data-action="back-to-edit-flow" style="display:none;">กลับ แก้ไข / ลบ</button>
+      <button class="btn" id="successBackToDup" data-action="back-to-duplicate-flow" style="display:none;">ทำซ้ำอีก event</button>
       <button class="btn" data-nav="home">กลับหน้าแรก</button>
     </div>
   </section>
