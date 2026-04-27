@@ -1,4 +1,4 @@
-const CACHE = 'qcal-v2';
+const CACHE = 'qcal-v3';
 const SHELL = [
   './',
   './index.html',

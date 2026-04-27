@@ -122,6 +122,16 @@ async function loadHomeData() {
 
 // ---- Auth flow ----
 
+async function completeSignIn(accessToken, expiresAt) {
+  state.accessToken = accessToken;
+  state.tokenExpiresAt = expiresAt;
+  const info = await fetchUserInfo(accessToken);
+  state.user = { email: info.email, name: info.name };
+  document.getElementById('userEmail').textContent = info.email;
+  showScreen('home');
+  loadHomeData();
+}
+
 async function doSignIn() {
   setWelcomeError('');
   const btn = document.getElementById('signInBtn');
@@ -129,13 +139,7 @@ async function doSignIn() {
   btn.textContent = 'กำลังลงชื่อเข้าใช้...';
   try {
     const { accessToken, expiresAt } = await requestToken({ silent: false });
-    state.accessToken = accessToken;
-    state.tokenExpiresAt = expiresAt;
-    const info = await fetchUserInfo(accessToken);
-    state.user = { email: info.email, name: info.name };
-    document.getElementById('userEmail').textContent = info.email;
-    showScreen('home');
-    loadHomeData();
+    await completeSignIn(accessToken, expiresAt);
   } catch (err) {
     setWelcomeError(friendlyAuthError(err));
   } finally {
@@ -784,6 +788,17 @@ async function bootstrap() {
     btn.textContent = 'Sign in with Google';
   } catch (err) {
     setWelcomeError('โหลด Google Identity Services ไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ');
+    document.getElementById('screen-welcome').classList.remove('welcome-pending');
+    return;
+  }
+  // Silent re-auth attempt: success → Home, any failure → stay on Welcome
+  try {
+    const { accessToken, expiresAt } = await requestToken({ silent: true });
+    await completeSignIn(accessToken, expiresAt);
+  } catch (err) {
+    console.debug('silent sign-in skipped:', err?.message);
+  } finally {
+    document.getElementById('screen-welcome').classList.remove('welcome-pending');
   }
 }
 

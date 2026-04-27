@@ -537,6 +537,7 @@ input, select, textarea, button { color-scheme: light; font-family: var(--font-s
   color: var(--text-muted);
   margin-top: 14px;
 }
+#screen-welcome.welcome-pending .welcome-body { visibility: hidden; }
 .error-banner {
   font-size: 13px;
   color: var(--danger);
