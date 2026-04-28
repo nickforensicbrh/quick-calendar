@@ -1085,15 +1085,7 @@ async function bootstrap() {
     document.getElementById('screen-welcome').classList.remove('welcome-pending');
     return;
   }
-  // Silent re-auth attempt: success → Home, any failure → stay on Welcome
-  try {
-    const { accessToken, expiresAt } = await requestToken({ silent: true });
-    await completeSignIn(accessToken, expiresAt);
-  } catch (err) {
-    console.debug('silent sign-in skipped:', err?.message);
-  } finally {
-    document.getElementById('screen-welcome').classList.remove('welcome-pending');
-  }
+  document.getElementById('screen-welcome').classList.remove('welcome-pending');
 }
 
 bootstrap();
